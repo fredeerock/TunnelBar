@@ -14,6 +14,13 @@ It handles the SAML web login in a native window, hands the resulting cookie to
   privileged helper
 - Remembers your last gateway address
 
+## Install
+
+Download the latest **TunnelBar.zip** from
+[Releases](https://github.com/fredeerock/TunnelBar/releases), unzip it, and drag
+`TunnelBar.app` into `/Applications`. The release is signed and notarized, so it
+opens with a normal double-click — no Gatekeeper warning.
+
 ## Requirements
 
 - macOS 13 (Ventura) or newer
@@ -27,7 +34,18 @@ It handles the SAML web login in a native window, hands the resulting cookie to
 ./Scripts/build-app.sh
 ```
 
-This produces `build/TunnelBar.app`. Move it to `/Applications`.
+This produces `build/TunnelBar.app` (ad-hoc signed). Move it to `/Applications`.
+
+To build a signed + notarized app, set your Developer ID and notary profile:
+
+```sh
+DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)" \
+AC_PROFILE=tunnelbar \
+./Scripts/build-app.sh
+```
+
+Create the notary profile once with
+`xcrun notarytool store-credentials tunnelbar --apple-id <id> --team-id <TEAMID>`.
 
 ## Usage
 
@@ -39,6 +57,6 @@ This produces `build/TunnelBar.app`. Move it to `/Applications`.
 
 ## Notes
 
-- The app is ad-hoc signed, not notarized. The first time you open it,
-  right-click the app → **Open** to get past Gatekeeper.
+- Release builds are notarized, so they open with a double-click. An ad-hoc
+  local build needs a right-click → **Open** the first time.
 - `openconnect` logs are written to `/var/log/gp-vpn-gui.log`.
