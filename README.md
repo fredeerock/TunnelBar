@@ -57,6 +57,4 @@ Create the notary profile once with
 
 ## Notes
 
-- Release builds are notarized, so they open with a double-click. An ad-hoc
-  local build needs a right-click → **Open** the first time.
 - `openconnect` logs are written to `/var/log/gp-vpn-gui.log`.
