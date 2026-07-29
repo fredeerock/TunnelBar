@@ -35,4 +35,11 @@ final class OpenConnectManager {
             _ = try ProcessRunner.run("/usr/bin/sudo", ["-n", helper, "disconnect"], input: nil)
         }.value
     }
+
+    /// Used at app termination when async work may not complete in time.
+    func disconnectSyncBestEffort() {
+        let helper = Self.helperPath
+        guard FileManager.default.isExecutableFile(atPath: helper) else { return }
+        _ = try? ProcessRunner.run("/usr/bin/sudo", ["-n", helper, "disconnect"], input: nil)
+    }
 }

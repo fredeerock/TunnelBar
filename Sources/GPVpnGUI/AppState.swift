@@ -33,6 +33,23 @@ final class AppState: ObservableObject {
     private let openconnect = OpenConnectManager()
     let dependencies = DependencyManager()
     private var samlController: SAMLLoginController?
+    private var terminateObserver: NSObjectProtocol?
+
+    init() {
+        terminateObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.willTerminateNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] _ in
+            self?.openconnect.disconnectSyncBestEffort()
+        }
+    }
+
+    deinit {
+        if let terminateObserver {
+            NotificationCenter.default.removeObserver(terminateObserver)
+        }
+    }
 
     // MARK: - Derived UI helpers
 

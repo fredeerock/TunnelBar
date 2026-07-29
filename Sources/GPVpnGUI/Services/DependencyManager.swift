@@ -87,7 +87,7 @@ final class DependencyManager {
     private func removeHelper() async throws {
         let removeScript = """
         #!/bin/bash
-        rm -f '\(OpenConnectManager.helperPath)' /etc/sudoers.d/gp-vpn-gui /var/run/gp-vpn-gui.pid /var/log/gp-vpn-gui.log
+        rm -f '\(OpenConnectManager.helperPath)' /etc/sudoers.d/gp-vpn-gui /var/run/gp-vpn-gui.pid /var/log/gp-vpn-gui.log /var/run/gp-vpn-gui.dnsbackup
         """
         try await runPrivilegedScript(removeScript, canceledMessage: "Uninstall was canceled.")
     }
