@@ -16,6 +16,33 @@ enum PreloginAuth {
 /// Replicates the first step of `gp-saml-gui`: POST to the gateway's
 /// `ssl-vpn/prelogin.esp` endpoint and extract the SAML request.
 final class PreloginService {
+    private let sessionFactory: (Bool) -> URLSession
+    private let retryDelayNanoseconds: UInt64
+    private let sleepFn: (UInt64) async -> Void
+
+    init(
+        sessionFactory: @escaping (Bool) -> URLSession = PreloginService.defaultSession,
+        retryDelayNanoseconds: UInt64 = 1_200_000_000,
+        sleepFn: @escaping (UInt64) async -> Void = { nanoseconds in
+            try? await Task.sleep(nanoseconds: nanoseconds)
+        }
+    ) {
+        self.sessionFactory = sessionFactory
+        self.retryDelayNanoseconds = retryDelayNanoseconds
+        self.sleepFn = sleepFn
+    }
+
+    private static func defaultSession(ignoreCert: Bool) -> URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.timeoutIntervalForRequest = 90
+        config.timeoutIntervalForResource = 150
+        config.waitsForConnectivity = true
+
+        if ignoreCert {
+            return URLSession(configuration: config, delegate: InsecureSessionDelegate(), delegateQueue: nil)
+        }
+        return URLSession(configuration: config)
+    }
 
     func fetch(server: String, clientOS: String, ignoreCert: Bool) async throws -> PreloginAuth {
         let host = normalizedHost(server)
@@ -25,6 +52,7 @@ final class PreloginService {
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
+        request.timeoutInterval = 90
         // The gateway expects this exact User-Agent for the SAML protocol.
         request.setValue("PAN GlobalProtect", forHTTPHeaderField: "User-Agent")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
@@ -41,26 +69,62 @@ final class PreloginService {
             .joined(separator: "&")
             .data(using: .utf8)
 
-        let session: URLSession
-        if ignoreCert {
-            session = URLSession(configuration: .ephemeral, delegate: InsecureSessionDelegate(), delegateQueue: nil)
-        } else {
-            session = URLSession(configuration: .ephemeral)
-        }
-
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw VPNError(message: "Could not reach \(host). \(error.localizedDescription)")
-        }
+        let (data, response) = try await performRequest(request, host: host, ignoreCert: ignoreCert)
 
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw VPNError(message: "The server returned an unexpected response. Check the VPN address.")
         }
 
         return try parse(data: data, host: host)
+    }
+
+    private func performRequest(_ request: URLRequest, host: String, ignoreCert: Bool) async throws -> (Data, URLResponse) {
+        let attempts = 2
+        var lastError: Error?
+
+        for attempt in 1...attempts {
+            let session = sessionFactory(ignoreCert)
+            do {
+                return try await session.data(for: request)
+            } catch {
+                lastError = error
+                guard shouldRetry(error: error), attempt < attempts else {
+                    throw userFacingError(for: error, host: host)
+                }
+                await sleepFn(retryDelayNanoseconds)
+            }
+        }
+
+        throw userFacingError(for: lastError ?? URLError(.unknown), host: host)
+    }
+
+    private func shouldRetry(error: Error) -> Bool {
+        guard let urlError = error as? URLError else { return false }
+        switch urlError.code {
+        case .timedOut, .networkConnectionLost, .cannotFindHost, .cannotConnectToHost, .dnsLookupFailed, .notConnectedToInternet:
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func userFacingError(for error: Error, host: String) -> VPNError {
+        guard let urlError = error as? URLError else {
+            return VPNError(message: "Could not reach \(host). \(error.localizedDescription)")
+        }
+
+        switch urlError.code {
+        case .timedOut:
+            return VPNError(message: "Could not reach \(host). The request timed out. Check your network and try again.")
+        case .cannotFindHost, .dnsLookupFailed:
+            return VPNError(message: "Could not resolve \(host). Check the VPN address and your DNS settings.")
+        case .cannotConnectToHost:
+            return VPNError(message: "Could not connect to \(host). The gateway may be unreachable from this network.")
+        case .notConnectedToInternet:
+            return VPNError(message: "You appear to be offline. Connect to the internet and try again.")
+        default:
+            return VPNError(message: "Could not reach \(host). \(urlError.localizedDescription)")
+        }
     }
 
     private func normalizedHost(_ server: String) -> String {

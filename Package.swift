@@ -10,6 +10,11 @@ let package = Package(
         .executableTarget(
             name: "GPVpnGUI",
             path: "Sources/GPVpnGUI"
+        ),
+        .testTarget(
+            name: "GPVpnGUITests",
+            dependencies: ["GPVpnGUI"],
+            path: "Tests/GPVpnGUITests"
         )
     ]
 )
