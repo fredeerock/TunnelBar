@@ -47,6 +47,35 @@ AC_PROFILE=tunnelbar \
 Create the notary profile once with
 `xcrun notarytool store-credentials tunnelbar --apple-id <id> --team-id <TEAMID>`.
 
+## Release
+
+Use the release wrapper to build, notarize, tag, and publish in one command:
+
+```sh
+./Scripts/release.sh v1.0.3
+```
+
+Optional custom release title:
+
+```sh
+./Scripts/release.sh v1.0.3 "TunnelBar v1.0.3"
+```
+
+The script will:
+
+- require a clean `main` branch and authenticated `gh`
+- push `main` and create/push the tag (if missing)
+- run signed + notarized build via `Scripts/build-app.sh`
+- verify Developer ID signature and stapled notarization ticket
+- create or update the GitHub release asset (`build/TunnelBar.zip`)
+
+Recommended shell profile setup (`~/.zshrc`) so releases work every time:
+
+```sh
+export DEVELOPER_ID="Developer ID Application: Your Name (TEAMID)"
+export AC_PROFILE="tunnelbar"
+```
+
 ## Usage
 
 1. Launch the app — a shield icon appears in the menu bar.
