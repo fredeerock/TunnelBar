@@ -40,8 +40,8 @@ final class AppState: ObservableObject {
             forName: NSApplication.willTerminateNotification,
             object: nil,
             queue: nil
-        ) { [weak self] _ in
-            self?.openconnect.disconnectSyncBestEffort()
+        ) { _ in
+            OpenConnectManager().disconnectSyncBestEffort()
         }
     }
 
